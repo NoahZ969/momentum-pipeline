@@ -1,0 +1,15 @@
+# Virtual environment — recreate with: pip install -r requirements.txt
+.venv/
+
+# Data files — large, licensed, regenerable from code
+data/raw/
+data/processed/
+data/external/
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# WRDS credentials
+.pgpass
