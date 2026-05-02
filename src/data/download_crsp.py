@@ -135,17 +135,40 @@ def download_sp500_membership(db=None) -> pd.DataFrame:
     import requests
     import io
 
+    headers = {'User-Agent': 'momentum-pipeline/1.0 (academic research project)'}
+
     # ------------------------------------------------------------------
     # Step 1: Download point-in-time constituent snapshots from GitHub
     # ------------------------------------------------------------------
     print("  Downloading S&P 500 historical constituents from GitHub (fja05680/sp500)...")
 
-    # Try the most recent dated file first, fall back to the base file
-    urls_to_try = [
-        "https://raw.githubusercontent.com/fja05680/sp500/master/S%26P%20500%20Historical%20Components%20%26%20Changes(07-12-2025).csv",
-        "https://raw.githubusercontent.com/fja05680/sp500/master/S%26P%20500%20Historical%20Components%20%26%20Changes(08-01-2024).csv",
-        "https://raw.githubusercontent.com/fja05680/sp500/master/S%26P%20500%20Historical%20Components%20%26%20Changes.csv",
-    ]
+    # Use GitHub API to find the most recent dated file
+    print("  Discovering latest file via GitHub API...")
+    api_url = "https://api.github.com/repos/fja05680/sp500/contents/"
+    try:
+        api_resp = requests.get(api_url, headers=headers, timeout=30)
+        api_resp.raise_for_status()
+        files = api_resp.json()
+        # Find all "Historical Components & Changes" files, prefer dated ones
+        historical_files = [
+            f for f in files
+            if 'Historical' in f.get('name', '') and f['name'].endswith('.csv')
+        ]
+        # Sort: dated files (with parentheses) first, by name descending (latest date first)
+        dated = [f for f in historical_files if '(' in f['name']]
+        undated = [f for f in historical_files if '(' not in f['name']]
+        # Dated files sorted descending by name gives us the most recent first
+        dated.sort(key=lambda f: f['name'], reverse=True)
+        ordered = dated + undated
+        urls_to_try = [f['download_url'] for f in ordered]
+        if urls_to_try:
+            print(f"    Found {len(urls_to_try)} candidate files, "
+                  f"trying: {ordered[0]['name']}")
+    except Exception as e:
+        print(f"    GitHub API failed ({e}), falling back to hardcoded URLs")
+        urls_to_try = [
+            "https://raw.githubusercontent.com/fja05680/sp500/master/S%26P%20500%20Historical%20Components%20%26%20Changes.csv",
+        ]
 
     headers = {'User-Agent': 'momentum-pipeline/1.0 (academic research project)'}
     pit_df = None
